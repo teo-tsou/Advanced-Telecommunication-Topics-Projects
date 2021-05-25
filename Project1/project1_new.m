@@ -1,12 +1,21 @@
-%Theodoros Tsourdinis 2303   1978.352485 sec 1364.857234  %
+%   Name: Theodoros Tsourdinis 
+%   AEM: 2303
+%   Project 1: m-PSK simulation 
+%   Only tested on MATLAB (version: 2016b)
+%   Estimated execution-elapsed time:  N = 10^4 ----> 21 seconds (7 seconds after 1st execution)
+%                                      N = 10^5 ----> 1-2 minutes 
+%                                      N = 10^6 ----> 11 minutes
+%   N: Number of Bits
 tic;
+N = 10^5;
 M = [1 2 3 4];
 SNRdb = [0 2 4 6 8 10 12 14 16 18 20];
 os = 5;
 a = 1;
 gtx = zeros(1,os);
 grx = gtx;
-N = 1000;
+
+ 
 
 while 1
     isOk = 1;
@@ -28,10 +37,9 @@ SNRlin = zeros(length(SNRdb),1);
 noise_power = zeros(length(SNRdb),1);
 output_bits = zeros(N,1);
 errors = zeros(length(M),length(SNRdb));
-%BER = zeros(length(M),length(SNRdb));
 bits = rand(1,N) < 0.5;
 
-%Main - Function%
+%Looping through modulations%
 for m = 1:length(M)
     xn = zeros(round(N/M(m)),1);
     sni = zeros(round(N/M(m)), os);
@@ -40,7 +48,9 @@ for m = 1:length(M)
     znq = zeros(round(N/M(m)),(2*os)-1);
     max_zni = zeros(round(N/M(m)),1);
     max_znq = zeros(round(N/M(m)),1);
+    m_symbols = zeros(M(m),1);
     
+    %Symbol m-psk encoder
     j = 1;
     for k = 1:M(m):N
         xni = cosd(bi2de(bits(k:k-1+M(m)), 'left-msb')*180/(2^(M(m)-1)));
@@ -50,7 +60,7 @@ for m = 1:length(M)
         xn(j) = xni + xnq;
         j = j + 1;
     end
-    
+    m_symbols = unique(xn);
     
 %     Tx Filtering
 
@@ -69,12 +79,13 @@ for m = 1:length(M)
       snq = snq';
       snq = snq(:);
       
-    
+    %Looping through SNR values
     for i = 1:length(SNRdb)
         SNRlin(i) = 10.^(SNRdb(i)./10);
         noise_power = 1./SNRlin(i);
         real_noise = sqrt(noise_power) .* randn(1,length(sni));
         imag_noise = sqrt(noise_power) .* randn(1,length(snq));
+        %Adding noise
         yni = sni + real_noise(:);
         ynq = snq + imag_noise(:);
         
@@ -112,14 +123,14 @@ for m = 1:length(M)
          
         %Decision Bit Maker%
           p = 1;
-          dist = zeros(length(xn),1);
+          dist = zeros(length(m_symbols),1);
           output_symbol = zeros(length(zn),1);
           for j = 1:length(zn)
-            for k = 1:length(xn)   
-                dist(k) = norm(xn(k)-zn(j));
+            for k = 1:length(m_symbols)   
+                dist(k) = norm(m_symbols(k)-zn(j));
             end
             [minv,idx] = min(dist);
-            output_symbol(j) = xn(idx);
+            output_symbol(j) = m_symbols(idx);
             phi= radtodeg(angle(output_symbol(j)));
             
             if (phi < 0)
@@ -128,23 +139,26 @@ for m = 1:length(M)
                 decoded = dec2bin(phi*(2^(M(m)-1))/180)-'0';
             end
             output_bits(p:p+M(m)-1) = [zeros(1, M(m)-length(decoded)) decoded];
-            dist = zeros(length(xn),1);
             p = p+M(m);
           end    
-                
+          
+        %Calculating errors
         for j = 1:N
             if(output_bits(j) ~= bits(j))
                 errors(m,i) = errors(m,i) + 1;
             end 
         end    
     end
+        %Constellation Diagrams
           figure(m);
           scatter(max_zni , max_znq,'*r')
           title(num2str(2^M(m),'Constellation Diagram of %-d-PSK'));
 end
 
+%Calculating BER
 BER = errors ./ N;
 
+%BER Diagrams
 figure(m+1);
 C = {'k','b','r','g','y',[.5 .6 .7],[.8 .2 .6]}; 
 semilogy(SNRdb,qfunc(sqrt(SNRlin)),'y-','linewidth',2.0); 
